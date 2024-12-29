@@ -1,37 +1,115 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QSizePolicy
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from constants import BACKGROUND_COLOR
+from PySide6.QtWidgets import (QGraphicsView, QGraphicsScene, QSizePolicy)
+from PySide6.QtCore import Qt, QRectF, QSize
+from PySide6.QtGui import QPixmap, QImage, QGuiApplication
+from constants import ZOOM_FACTOR
 from utils.dicom_utils import normalize_pixel_array
 
-class ImageViewer(QWidget):
+
+class ImageViewer(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
 
-        self.figure = Figure(facecolor=BACKGROUND_COLOR)
-        self.canvas = FigureCanvas(self.figure)
-        self.layout.addWidget(self.canvas)
+        # Initialize the graphics scene
+        self.scene = QGraphicsScene(self)
+        self.setScene(self.scene)
+        self._configure_view_settings()
 
-        self.ax = self.figure.add_subplot(111)
-        self.ax.set_facecolor(BACKGROUND_COLOR)
-        self.ax.axis("off")
+        self.image_item = None
+        self.zoom_factor = ZOOM_FACTOR
+        self.current_zoom = 1.0
 
+    def _configure_view_settings(self) -> None:
+        """Configure all view-related settings in one place"""
+        # Enable antialiasing for smoother rendering
+        self.setRenderHint(self.renderHints().Antialiasing)
+        # Optimize viewport updates
+        self.setViewportUpdateMode(QGraphicsView.MinimalViewportUpdate)
+        # Disable scrollbars for better touch/mouse control
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        # Set anchor points for transformations
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+
+        # Enable drag mode for panning
+        self.setDragMode(QGraphicsView.ScrollHandDrag)
+
+        # Allow the widget to expand in both directions
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.image_height = 0
-        self.image_width = 0
+
+    def minimumSizeHint(self) -> QSize:
+        """Calculate the minimum allowed size based on screen dimensions"""
+        screen_size = QGuiApplication.primaryScreen().availableGeometry().size()
+        return QSize(screen_size.width() // 2, screen_size.height() // 2)
+
 
     def display_image(self, dataset):
-        self.ax.clear()
-        self.ax.axis("off")
+        """Display a DICOM image from the dataset
 
+        Args:
+            dataset: DICOM dataset containing pixel_array
+        """
         try:
-            if hasattr(dataset, "pixel_array"):
-                pixel_array = normalize_pixel_array(dataset.pixel_array)
-                self.image_height, self.image_width = pixel_array.shape[:2]
-                self.ax.imshow(pixel_array, cmap="gray")
-                self.figure.tight_layout(pad=0)
-                self.canvas.draw()
+            if not hasattr(dataset, "pixel_array"):
+                return
+
+            # Process and normalize the pixel array
+            pixel_array = normalize_pixel_array(dataset.pixel_array)
+
+            # Create and display the image
+            image = self._create_qimage(pixel_array)
+            self._setup_image_display(image)
+
         except Exception as e:
             print(f"Error displaying image: {e}")
+
+    def _create_qimage(self, pixel_array):
+        """Create QImage from normalized pixel array"""
+        height, width = pixel_array.shape
+        return QImage(pixel_array.data, width, height, width, QImage.Format_Grayscale8)
+
+    def _setup_image_display(self, image):
+        """Setup the image display with the new image"""
+        pixmap = QPixmap.fromImage(image)
+        self.scene.clear()
+        self.image_item = self.scene.addPixmap(pixmap)
+
+        # Reset view properties
+        self.current_zoom = 1.0
+        self.setTransform(self.transform().scale(1, 1))
+
+        # Update scene and view
+        self.scene.setSceneRect(QRectF(pixmap.rect()))
+        self.centerAndScaleImage()
+        self.updateGeometry()
+
+    def centerAndScaleImage(self):
+        """Center and scale image to fit the view while maintaining aspect ratio"""
+        if not self.image_item:
+            return
+
+        # Calculate the best scale factor to fit the view
+        viewport_rect = self.viewport().rect()
+        scene_rect = self.scene.sceneRect()
+
+        scale = min(viewport_rect.width() / scene_rect.width(),
+                   viewport_rect.height() / scene_rect.height())
+
+        # Apply transformation
+        self.resetTransform()
+        self.scale(scale, scale)
+        self.centerOn(scene_rect.center())
+        self.current_zoom = scale
+
+    def wheelEvent(self, event):
+        """Handle mouse wheel zoom events"""
+        if self.image_item:
+            factor = self.zoom_factor if event.angleDelta().y() > 0 else 1 / self.zoom_factor
+            self.current_zoom *= factor
+            self.scale(factor, factor)
+
+    def resizeEvent(self, event):
+        """Handle widget resize events"""
+        super().resizeEvent(event)
+        self.centerAndScaleImage()
