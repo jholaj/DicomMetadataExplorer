@@ -6,11 +6,17 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
+    QMessageBox,
+    QDialog,
+    QLabel,
     QTreeWidget,
     QTreeWidgetItem,
+    QFormLayout,
     QFileDialog,
+    QDialogButtonBox,
     QLineEdit,
     QHeaderView,
+    QMenu,
     QSizePolicy,
     QTabWidget,
     QToolBar,
@@ -72,11 +78,57 @@ class ImageViewer(QWidget):
         except Exception as e:
             print(f"Error displaying image: {e}")
 
+class EditTagDialog(QDialog):
+    def __init__(self, tag_item, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit DICOM Tag")
+        self.tag_item = tag_item
+
+        layout = QFormLayout(self)
+
+        # Create input fields
+        self.value_edit = QLineEdit(tag_item.text(3))
+
+        # Add fields to layout
+        layout.addRow("Tag:", QLabel(tag_item.text(0)))
+        layout.addRow("Name:", QLabel(tag_item.text(1)))
+        layout.addRow("VR:", QLabel(tag_item.text(2)))
+        layout.addRow("Value:", self.value_edit)
+
+        # Add buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addRow(button_box)
+
+        # Apply styles
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {BACKGROUND_COLOR};
+                color: {TEXT_COLOR};
+            }}
+            QLabel {{
+                color: {TEXT_COLOR};
+            }}
+            QLineEdit {{
+                padding: 6px;
+                border: 1px solid #444444;
+                border-radius: 4px;
+                background-color: #2d2d2d;
+                color: {TEXT_COLOR};
+            }}
+        """)
+
+    def get_value(self):
+        return self.value_edit.text()
 
 class MetadataViewer(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
+        self.dataset = None
 
         # Search bar
         self.search_input = QLineEdit()
@@ -86,6 +138,8 @@ class MetadataViewer(QWidget):
         # Tree widget for DICOM tags
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Tag", "Name", "VR", "Value"])
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.show_context_menu)
 
         # Set resize mode for columns
         header = self.tree.header()
@@ -95,6 +149,50 @@ class MetadataViewer(QWidget):
         layout.addWidget(self.tree)
 
         self.search_input.textChanged.connect(self.filter_items)
+
+    def show_context_menu(self, position):
+        item = self.tree.itemAt(position)
+        if item:
+            menu = QMenu()
+            edit_action = menu.addAction("Edit Tag")
+            action = menu.exec(self.tree.viewport().mapToGlobal(position))
+
+            if action == edit_action:
+                self.edit_tag(item)
+
+    def edit_tag(self, item):
+        if not self.dataset:
+            return
+        dialog = EditTagDialog(item, self)
+        if dialog.exec() == QDialog.Accepted:
+            try:
+                # Get tag from the item text (format: "(group,element)")
+                tag_str = item.text(0)[1:-1]  # Remove parentheses
+                group, element = map(lambda x: int(x, 16), tag_str.split(','))
+                tag = (group, element)
+
+                # Update the tag value in the dataset
+                data_element = self.dataset[tag]
+                new_value = dialog.get_value()
+
+                # Convert the string value to the appropriate type based on VR
+                vr = item.text(2)
+                if vr in ['DS', 'FL', 'FD']:
+                    data_element.value = float(new_value)
+                elif vr in ['IS', 'SL', 'SS', 'UL', 'US']:
+                    data_element.value = int(new_value)
+                else:
+                    data_element.value = new_value
+
+                # Update the display
+                item.setText(3, str(data_element.value))
+
+                # Show success message in status bar
+                if hasattr(self.window(), 'status_bar'):
+                    self.window().status_bar.showMessage("Tag updated successfully", 3000)
+
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to update tag: {str(e)}")
 
     def filter_items(self, text):
         text = text.lower()
@@ -107,6 +205,8 @@ class MetadataViewer(QWidget):
 
     def load_metadata(self, dataset):
         self.tree.clear()
+        self.dataset = dataset
+
         for elem in dataset:
             if elem.tag.group != 0x7FE0:  # Skip pixel data
                 item = QTreeWidgetItem()
@@ -130,6 +230,7 @@ class DicomExplorer(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("DICOM Explorer")
+        self.dataset = None
 
         # Create main widget and layout
         main_widget = QWidget()
@@ -145,6 +246,11 @@ class DicomExplorer(QMainWindow):
         open_action.setShortcut(QKeySequence.Open)
         open_action.triggered.connect(self.browse_file)
         toolbar.addAction(open_action)
+
+        save_action = QAction("Save", self)
+        save_action.setShortcut(QKeySequence.Save)
+        save_action.triggered.connect(self.save_file)
+        toolbar.addAction(save_action)
 
         # File path display
         self.file_path = QLineEdit()
@@ -173,6 +279,26 @@ class DicomExplorer(QMainWindow):
 
         # Set application styles
         self.apply_styles()
+
+    def save_file(self):
+        if not self.dataset:
+            self.status_bar.showMessage("No DICOM file loaded")
+            return
+
+        file_name, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save DICOM file",
+            str(Path.home()),
+            "DICOM files (*.dcm);;All files (*.*)",
+        )
+
+        if file_name:
+            try:
+                self.dataset.save_as(file_name)
+                self.status_bar.showMessage(f"File saved successfully to {file_name}", 3000)
+            except Exception as e:
+                self.status_bar.showMessage(f"Error saving file: {str(e)}")
+                QMessageBox.warning(self, "Error", f"Failed to save file: {str(e)}")
 
     def apply_styles(self):
         style_sheet = f"""
@@ -250,18 +376,19 @@ class DicomExplorer(QMainWindow):
 
     def load_dicom(self, file_path):
         try:
-            dataset = pydicom.dcmread(file_path)
-            if not dataset:
+            self.dataset = pydicom.dcmread(file_path)
+            if not self.dataset:
                 raise ValueError("No data found in DICOM file.")
+
 
             self.file_path.setText(file_path)
 
             # Load metadata
-            self.metadata_viewer.load_metadata(dataset)
+            self.metadata_viewer.load_metadata(self.dataset)
 
             # Display image
-            if hasattr(dataset, "pixel_array"):
-                self.image_viewer.display_image(dataset)
+            if hasattr(self.dataset, "pixel_array"):
+                self.image_viewer.display_image(self.dataset)
 
             # Update status bar
             self.status_bar.showMessage(
