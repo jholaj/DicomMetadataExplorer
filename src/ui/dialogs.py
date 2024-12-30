@@ -2,7 +2,6 @@ from PySide6.QtWidgets import (
     QDialog, QFormLayout, QLabel, QLineEdit,
     QDialogButtonBox
 )
-from constants import BACKGROUND_COLOR, TEXT_COLOR
 
 class EditTagDialog(QDialog):
     def __init__(self, tag_item, parent=None):
@@ -24,23 +23,6 @@ class EditTagDialog(QDialog):
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addRow(button_box)
-
-        self.setStyleSheet(f"""
-            QDialog {{
-                background-color: {BACKGROUND_COLOR};
-                color: {TEXT_COLOR};
-            }}
-            QLabel {{
-                color: {TEXT_COLOR};
-            }}
-            QLineEdit {{
-                padding: 6px;
-                border: 1px solid #444444;
-                border-radius: 4px;
-                background-color: #2d2d2d;
-                color: {TEXT_COLOR};
-            }}
-        """)
 
     def get_value(self):
         return self.value_edit.text()
