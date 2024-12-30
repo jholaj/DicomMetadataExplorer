@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QToolBar,
     QLineEdit, QTabWidget, QStatusBar, QFileDialog,
-    QMessageBox
+    QMessageBox, QLabel
 )
 from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt
@@ -52,7 +52,44 @@ class DicomExplorer(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
+        self.zoom_label = QLabel("Zoom: 100%")
+        self.zoom_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.status_bar.addPermanentWidget(self.zoom_label)
+        self.zoom_label.hide()
+
+        self.tab_widget.currentChanged.connect(self.update_status_bar)
+        self.image_viewer.zoom_changed.connect(self.update_zoom_status)
+
         self.setStyleSheet(get_application_style())
+
+    def update_status_bar(self, index: int) -> None:
+        """Updates the status bar based on the active tab and application state."""
+        if not self.dataset:
+            self.status_bar.showMessage("No DICOM file loaded")
+            self.zoom_label.hide()
+            return
+
+        if index == 0:  # Metadata tab
+            tag_count = self.metadata_viewer.tree.topLevelItemCount()
+            self.status_bar.showMessage(f"Loaded {tag_count} DICOM tags")
+            self.zoom_label.hide()
+
+        elif index == 1:  # Content tab
+            if hasattr(self.dataset, "pixel_array"):
+                dimensions = self.dataset.pixel_array.shape
+                bits = getattr(self.dataset, "BitsStored", "unknown")
+                self.status_bar.showMessage(
+                    f"Dimensions: {dimensions[1]}x{dimensions[0]}, {bits} bits/pixel"
+                )
+                self.zoom_label.show()
+            else:
+                self.zoom_label.hide()
+
+    def update_zoom_status(self, relative_zoom):
+        """Update the zoom level display"""
+        zoom_percentage = int(relative_zoom * 100)
+        self.zoom_label.setText(f"Zoom: {zoom_percentage}%")
+        self.zoom_label.show()
 
     def save_file(self):
         if not self.dataset:

@@ -1,11 +1,12 @@
 from PySide6.QtWidgets import (QGraphicsView, QGraphicsScene, QSizePolicy)
-from PySide6.QtCore import Qt, QRectF, QSize
+from PySide6.QtCore import Qt, QRectF, QSize, Signal
 from PySide6.QtGui import QPixmap, QImage, QGuiApplication
 from constants import ZOOM_FACTOR
 from utils.dicom_utils import normalize_pixel_array
 
 
 class ImageViewer(QGraphicsView):
+    zoom_changed = Signal(float)
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -17,6 +18,7 @@ class ImageViewer(QGraphicsView):
         self.image_item = None
         self.zoom_factor = ZOOM_FACTOR
         self.current_zoom = 1.0
+        self.base_scale = 1.0  # Track the initial scaling factor
 
     def _configure_view_settings(self) -> None:
         """Configure all view-related settings in one place"""
@@ -100,7 +102,12 @@ class ImageViewer(QGraphicsView):
         self.resetTransform()
         self.scale(scale, scale)
         self.centerOn(scene_rect.center())
+
+        # Store the initial scale as base scale and reset current zoom
+        self.base_scale = scale
         self.current_zoom = scale
+        # Emit 1.0 as we're at base scale
+        self.zoom_changed.emit(1.0)
 
     def wheelEvent(self, event):
         """Handle mouse wheel zoom events"""
@@ -108,6 +115,8 @@ class ImageViewer(QGraphicsView):
             factor = self.zoom_factor if event.angleDelta().y() > 0 else 1 / self.zoom_factor
             self.current_zoom *= factor
             self.scale(factor, factor)
+            # Emit relative zoom compared to base scale
+            self.zoom_changed.emit(self.current_zoom / self.base_scale)
 
     def resizeEvent(self, event):
         """Handle widget resize events"""
