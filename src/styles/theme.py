@@ -1,4 +1,4 @@
-from constants import BACKGROUND_COLOR, TEXT_COLOR, BUTTON_COLOR, BUTTON_HOVER_COLOR
+from constants import BACKGROUND_COLOR, TEXT_COLOR, BUTTON_COLOR, BUTTON_HOVER_COLOR, BUTTON_CHECKED_COLOR
 
 def get_application_style():
     return f"""
@@ -25,15 +25,29 @@ def get_application_style():
             background-color: #2d2d2d;
             color: {TEXT_COLOR};
         }}
-        QPushButton {{
+        /* Standard buttons */
+        QToolBar QPushButton, QDialog QPushButton {{
             padding: 6px 12px;
             background-color: {BUTTON_COLOR};
             color: {TEXT_COLOR};
             border: none;
             border-radius: 4px;
         }}
-        QPushButton:hover {{
+        QToolBar QPushButton:hover, QDialog QPushButton:hover {{
             background-color: {BUTTON_HOVER_COLOR};
+        }}
+        /* Thumbnail items */
+        QWidget#thumbnail_panel QPushButton {{
+            padding: 0px;
+            margin: 0px;
+            border: none;
+            background-color: transparent;
+        }}
+        QWidget#thumbnail_panel QPushButton:hover {{
+            background-color: {BUTTON_HOVER_COLOR};
+        }}
+        QWidget#thumbnail_panel QPushButton:checked {{
+                   background-color: {BUTTON_CHECKED_COLOR};
         }}
         QTabWidget::pane {{
             border: 1px solid #444444;
