@@ -82,6 +82,22 @@ class MetadataViewer(QWidget):
             )
             item.setHidden(not matches)
 
+
+    def create_sequence_tree(self, sequence_items, parent_item):
+        try:
+            for item in sequence_items:
+                for elem in item['elements']:
+                    child = QTreeWidgetItem(parent_item)
+                    tag_str = f"({elem['tag'][0]:04x},{elem['tag'][1]:04x})"
+                    value_str = str(elem['value'][0]) if isinstance(elem['value'], tuple) else str(elem['value'])
+
+                    child.setText(0, tag_str)
+                    child.setText(1, elem['name'])
+                    child.setText(2, elem['vr'])
+                    child.setText(3, value_str)
+        except Exception as e:
+            print(f"Error in create_sequence_tree: {e}")
+
     def load_metadata(self, dataset):
         self.tree.clear()
         self.dataset = dataset
@@ -90,10 +106,12 @@ class MetadataViewer(QWidget):
             if elem.tag.group != 0x7FE0:  # Skip pixel data
                 item = QTreeWidgetItem()
                 tag_str = f"({elem.tag.group:04x},{elem.tag.element:04x})"
-                value_str = get_tag_value_str(elem)
-
+                value_str, sequence_items = get_tag_value_str(elem)
                 item.setText(0, tag_str)
                 item.setText(1, elem.name or "")
                 item.setText(2, getattr(elem, "VR", ""))
                 item.setText(3, value_str)
                 self.tree.addTopLevelItem(item)
+
+                if sequence_items:
+                    self.create_sequence_tree(sequence_items, item)
