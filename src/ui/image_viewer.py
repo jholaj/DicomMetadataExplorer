@@ -1,16 +1,19 @@
-from PySide6.QtWidgets import (QGraphicsView, QGraphicsScene, QSizePolicy)
+from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QSizePolicy
 from PySide6.QtCore import Qt, QRectF, QSize, Signal
 from PySide6.QtGui import QPixmap, QImage, QGuiApplication
 from constants import ZOOM_FACTOR
 from utils.dicom_utils import normalize_pixel_array
+import numpy as np
 
 
 class ImageViewer(QGraphicsView):
     zoom_changed = Signal(float)
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._setup_ui()
 
-        # Initialize the graphics scene
+    def _setup_ui(self):
+        """Initialize the user interface."""
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self._configure_view_settings()
@@ -20,8 +23,8 @@ class ImageViewer(QGraphicsView):
         self.current_zoom = 1.0
         self.base_scale = 1.0  # Track the initial scaling factor
 
-    def _configure_view_settings(self) -> None:
-        """Configure all view-related settings in one place"""
+    def _configure_view_settings(self):
+        """Configure all view-related settings."""
         # Enable antialiasing for smoother rendering
         self.setRenderHint(self.renderHints().Antialiasing)
         # Optimize viewport updates
@@ -41,38 +44,32 @@ class ImageViewer(QGraphicsView):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def minimumSizeHint(self) -> QSize:
-        """Calculate the minimum allowed size based on screen dimensions"""
+        """Calculate the minimum allowed size based on screen dimensions."""
         screen_size = QGuiApplication.primaryScreen().availableGeometry().size()
         return QSize(screen_size.width() // 2, screen_size.height() // 2)
 
-
     def display_image(self, dataset):
-        """Display a DICOM image from the dataset
-
-        Args:
-            dataset: DICOM dataset containing pixel_array
-        """
+        """Display a DICOM image from the dataset."""
         try:
             if not hasattr(dataset, "pixel_array"):
                 return
 
-            # Process and normalize the pixel array
             pixel_array = normalize_pixel_array(dataset.pixel_array)
-
-            # Create and display the image
             image = self._create_qimage(pixel_array)
             self._setup_image_display(image)
-
         except Exception as e:
             print(f"Error displaying image: {e}")
 
     def _create_qimage(self, pixel_array):
-        """Create QImage from normalized pixel array"""
+        """Create QImage from normalized pixel array."""
+        if not isinstance(pixel_array, np.ndarray) or len(pixel_array.shape) != 2:
+            raise ValueError("Invalid pixel array: Expected a 2D NumPy array")
+
         height, width = pixel_array.shape
         return QImage(pixel_array.data, width, height, width, QImage.Format_Grayscale8)
 
     def _setup_image_display(self, image):
-        """Setup the image display with the new image"""
+        """Setup the image display with the new image."""
         pixmap = QPixmap.fromImage(image)
         self.scene.clear()
         self.image_item = self.scene.addPixmap(pixmap)
@@ -87,7 +84,7 @@ class ImageViewer(QGraphicsView):
         self.updateGeometry()
 
     def centerAndScaleImage(self):
-        """Center and scale image to fit the view while maintaining aspect ratio"""
+        """Center and scale image to fit the view while maintaining aspect ratio."""
         if not self.image_item:
             return
 
@@ -110,7 +107,7 @@ class ImageViewer(QGraphicsView):
         self.zoom_changed.emit(1.0)
 
     def wheelEvent(self, event):
-        """Handle mouse wheel zoom events"""
+        """Handle mouse wheel zoom events."""
         if self.image_item:
             factor = self.zoom_factor if event.angleDelta().y() > 0 else 1 / self.zoom_factor
             self.current_zoom *= factor
@@ -119,6 +116,14 @@ class ImageViewer(QGraphicsView):
             self.zoom_changed.emit(self.current_zoom / self.base_scale)
 
     def resizeEvent(self, event):
-        """Handle widget resize events"""
+        """Handle widget resize events."""
         super().resizeEvent(event)
         self.centerAndScaleImage()
+
+    def clear(self):
+        """Clear the current image from the viewer."""
+        self.scene.clear()
+        self.image_item = None
+        self.current_zoom = 1.0
+        self.base_scale = 1.0
+        self.resetTransform()
