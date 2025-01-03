@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QToolBar,
     QLineEdit, QTabWidget, QStatusBar, QFileDialog,
     QMessageBox, QLabel, QHBoxLayout, QGridLayout,
-    QPushButton, QFrame
+    QPushButton, QFrame, QScrollArea
 )
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtCore import Qt, QSize
@@ -38,12 +38,8 @@ class DicomExplorer(QMainWindow):
         layout = QHBoxLayout(main_widget)
 
         # Left panel for DICOM thumbnails
-        self.thumbnail_panel = QWidget()
-        self.thumbnail_panel.setObjectName("thumbnail_panel")
-        self.thumbnail_layout = QGridLayout(self.thumbnail_panel)
-        self.thumbnail_panel.setMinimumWidth(THUMBNAIL_PANEL_WIDTH)
-        self.thumbnail_panel.setMaximumWidth(THUMBNAIL_PANEL_WIDTH)
-        layout.addWidget(self.thumbnail_panel)
+        scroll_area = self.initialize_left_panel()
+        layout.addWidget(scroll_area)
 
         # Right panel for main content
         right_panel = QWidget()
@@ -117,6 +113,25 @@ class DicomExplorer(QMainWindow):
                 self.zoom_label.show()
             else:
                 self.zoom_label.hide()
+
+    def initialize_left_panel(self):
+        """Initialize the left panel with thumbnails and scroll area."""
+        self.thumbnail_panel = QWidget()
+        self.thumbnail_panel.setObjectName("thumbnail_panel")
+        self.thumbnail_layout = QGridLayout(self.thumbnail_panel)
+        self.thumbnail_layout.setAlignment(Qt.AlignTop)
+
+        # Create a QScrollArea and set the thumbnail_panel as its widget
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(self.thumbnail_panel)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        scroll_area.setMinimumWidth(THUMBNAIL_PANEL_WIDTH)
+        scroll_area.setMaximumWidth(THUMBNAIL_PANEL_WIDTH)
+
+        return scroll_area
 
     def update_zoom_status(self, relative_zoom):
         """Update the zoom level display."""
