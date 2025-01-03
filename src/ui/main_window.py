@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QToolBar,
     QLineEdit, QTabWidget, QStatusBar, QFileDialog,
     QMessageBox, QLabel, QHBoxLayout, QGridLayout,
-    QPushButton
+    QPushButton, QFrame
 )
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtCore import Qt, QSize
@@ -203,13 +203,20 @@ class DicomExplorer(QMainWindow):
         self.thumbnail_layout.setAlignment(Qt.AlignTop)
 
     def add_study_groups_to_layout(self):
-        """Add study groups to the thumbnail layout."""
-        row = 0
-        for study_uid, datasets in self.study_groups.items():
-            self.add_study_label(study_uid, datasets[0][1], row)
-            row += 1
-            row = self.add_thumbnails_for_study(datasets, row)
-            row += 1
+            """Add study groups to the thumbnail layout."""
+            row = 0
+            last_study_index = len(self.study_groups) - 1
+
+            for i, (study_uid, datasets) in enumerate(self.study_groups.items()):
+                self.add_study_label(study_uid, datasets[0][1], row)
+                row += 1
+                row = self.add_thumbnails_for_study(datasets, row)
+
+                # Add horizontal separator after each study (except the last one)
+                if i < last_study_index:
+                    separator = self.create_horizontal_separator()
+                    self.thumbnail_layout.addWidget(separator, row, 0, 1, 2)
+                    row += 1
 
     def add_study_label(self, study_uid, dataset, row):
         """Add a study label to the thumbnail layout."""
@@ -241,6 +248,13 @@ class DicomExplorer(QMainWindow):
         if len(datasets) % 2 == 1:
             row += 1
         return row
+
+    def create_horizontal_separator(self):
+        """Create a horizontal separator line."""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFixedHeight(1)
+        return separator
 
     def create_thumbnail(self, file_path, dataset):
         """Create a thumbnail widget for a DICOM file."""

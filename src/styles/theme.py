@@ -1,4 +1,12 @@
-from constants import BACKGROUND_COLOR, TEXT_COLOR, BUTTON_COLOR, BUTTON_HOVER_COLOR, BUTTON_CHECKED_COLOR
+from constants import (
+    BACKGROUND_COLOR,
+    TEXT_COLOR,
+    BUTTON_COLOR,
+    BUTTON_HOVER_COLOR,
+    BUTTON_CHECKED_COLOR,
+    VERTICAL_LINE_COLOR,
+)
+
 
 def get_application_style():
     return f"""
@@ -74,5 +82,10 @@ def get_application_style():
         QStatusBar {{
             background: #2d2d2d;
             color: {TEXT_COLOR};
+        }}
+        /* Horizontal line */
+        QFrame[frameShape="4"] {{      /* HLine */
+            background-color: {VERTICAL_LINE_COLOR};
+            border: none;
         }}
     """
