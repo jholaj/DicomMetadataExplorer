@@ -198,25 +198,24 @@ class DicomExplorer(QMainWindow):
 
     def clear_thumbnail_layout(self):
         """Clear the existing thumbnail layout."""
-        for i in reversed(range(self.thumbnail_layout.count())):
-            self.thumbnail_layout.itemAt(i).widget().setParent(None)
-        self.thumbnail_layout.setAlignment(Qt.AlignTop)
+        while self.thumbnail_layout.count():
+            item = self.thumbnail_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
     def add_study_groups_to_layout(self):
             """Add study groups to the thumbnail layout."""
             row = 0
-            last_study_index = len(self.study_groups) - 1
 
-            for i, (study_uid, datasets) in enumerate(self.study_groups.items()):
-                self.add_study_label(study_uid, datasets[0][1], row)
-                row += 1
-                row = self.add_thumbnails_for_study(datasets, row)
-
-                # Add horizontal separator after each study (except the last one)
-                if i < last_study_index:
+            for study_uid, datasets in self.study_groups.items():
+                if row > 0:
                     separator = self.create_horizontal_separator()
                     self.thumbnail_layout.addWidget(separator, row, 0, 1, 2)
                     row += 1
+
+                self.add_study_label(study_uid, datasets[0][1], row)
+                row += 1
+                row = self.add_thumbnails_for_study(datasets, row)
 
     def add_study_label(self, study_uid, dataset, row):
         """Add a study label to the thumbnail layout."""
@@ -253,6 +252,7 @@ class DicomExplorer(QMainWindow):
         """Create a horizontal separator line."""
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
+        separator.setObjectName("study_separator")
         separator.setFixedHeight(1)
         return separator
 

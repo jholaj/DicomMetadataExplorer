@@ -83,8 +83,8 @@ def get_application_style():
             background: #2d2d2d;
             color: {TEXT_COLOR};
         }}
-        /* Horizontal line */
-        QFrame[frameShape="4"] {{      /* HLine */
+        /* Study separators */
+        QFrame#study_separator {{
             background-color: {VERTICAL_LINE_COLOR};
             border: none;
         }}
