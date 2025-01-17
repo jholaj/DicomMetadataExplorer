@@ -4,9 +4,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton
 
+from constants import THUMBNAIL_SIZE
 from ui.viewers.image_viewer import ImageViewer
 from utils.dicom_utils import normalize_pixel_array
-from constants import THUMBNAIL_SIZE
 
 
 class ThumbnailManager:

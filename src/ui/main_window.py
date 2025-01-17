@@ -5,7 +5,6 @@ import pydicom.config
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
-    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -268,25 +267,12 @@ class DicomExplorer(QMainWindow):
 
     def save_file(self):
         """Save the currently selected DICOM file."""
-        if not self.current_file or self.current_file not in self.datasets:
+        if not hasattr(self, "current_file") or not hasattr(self, "datasets") or self.current_file not in self.datasets:
             self.status_bar.showMessage("No DICOM file loaded")
             return
 
-        file_name, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save DICOM file",
-            str(Path.home()),
-            "DICOM files (*.dcm);;All files (*.*)",
-        )
-
-        if file_name:
-            try:
-                self.datasets[self.current_file].save_as(file_name)
-                self.status_bar.showMessage(
-                    f"File saved successfully to {file_name}", 3000
-                )
-            except Exception as e:
-                self.show_error_message(f"Failed to save file: {str(e)}")
+        # Use FileBrowserManager to handle the save dialog
+        self.file_browser_manager.save_file(self.datasets[self.current_file], self.current_file)
 
     def show_error_message(self, message):
         """Show an error message in the status bar and a message box."""

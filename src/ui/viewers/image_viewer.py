@@ -1,13 +1,15 @@
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QSizePolicy
-from PySide6.QtCore import Qt, QRectF, QSize, Signal
-from PySide6.QtGui import QPixmap, QImage, QGuiApplication
+import numpy as np
+from PySide6.QtCore import QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QGuiApplication, QImage, QPixmap
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsView, QSizePolicy
+
 from constants import ZOOM_FACTOR
 from utils.dicom_utils import normalize_pixel_array
-import numpy as np
 
 
 class ImageViewer(QGraphicsView):
     zoom_changed = Signal(float)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_ui()
