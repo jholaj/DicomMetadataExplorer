@@ -1,7 +1,5 @@
-from PySide6.QtWidgets import (
-    QDialog, QFormLayout, QLabel, QLineEdit,
-    QDialogButtonBox
-)
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit
+
 
 class EditTagDialog(QDialog):
     def __init__(self, tag_item, parent=None):

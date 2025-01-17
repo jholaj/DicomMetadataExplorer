@@ -8,6 +8,7 @@ VERTICAL_LINE_COLOR = "#444444"
 ACCENT_COLOR = "#0078d4"
 DISABLED_COLOR = "#666666"
 
+
 def get_application_style():
     return f"""
         /* General application styling */
