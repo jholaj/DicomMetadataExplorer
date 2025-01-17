@@ -1,2 +1,6 @@
+from PySide6.QtCore import QSize
+
 # UI
 ZOOM_FACTOR = 1.15
+THUMBNAIL_SIZE = QSize(70, 70)
+THUMBNAIL_PANEL_WIDTH = 200

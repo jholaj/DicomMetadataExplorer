@@ -1,11 +1,10 @@
 from pathlib import Path
 
 import pydicom
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QAction, QPixmap
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QFileDialog,
-    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -21,113 +20,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from constants import THUMBNAIL_PANEL_WIDTH
 from styles.theme import get_application_style
-from ui.image_viewer import ImageViewer
-from ui.metadata_viewer import MetadataViewer
-from utils.dicom_utils import normalize_pixel_array
+from ui.managers.file_browser_manager import FileBrowserManager
+from ui.managers.thumbnail_manager import ThumbnailManager
+from ui.viewers.image_viewer import ImageViewer
+from ui.viewers.metadata_viewer import MetadataViewer
 
 # Constants
-THUMBNAIL_SIZE = QSize(70, 70)
-THUMBNAIL_PANEL_WIDTH = 200
 ERROR_MESSAGE_TEMPLATE = "Error: {}"
-
-
-class ThumbnailManager:
-    def __init__(self, thumbnail_panel, thumbnail_layout, datasets, study_groups):
-        self.thumbnail_panel = thumbnail_panel
-        self.thumbnail_layout = thumbnail_layout
-        self.datasets = datasets
-        self.study_groups = study_groups
-
-    def rebuild_thumbnail_layout(self):
-        """Rebuild the thumbnail layout based on grouped datasets."""
-        self.clear_thumbnail_layout()
-        self.add_study_groups_to_layout()
-
-    def clear_thumbnail_layout(self):
-        """Clear the existing thumbnail layout."""
-        while self.thumbnail_layout.count():
-            item = self.thumbnail_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-    def add_study_groups_to_layout(self):
-        """Add study groups to the thumbnail layout."""
-        row = 0
-
-        for study_uid, datasets in self.study_groups.items():
-            if row > 0:
-                separator = self.create_horizontal_separator()
-                self.thumbnail_layout.addWidget(separator, row, 0, 1, 2)
-                row += 1
-
-            self.add_study_label(study_uid, datasets[0][1], row)
-            row += 1
-            row = self.add_thumbnails_for_study(datasets, row)
-
-    def add_study_label(self, study_uid, dataset, row):
-        """Add a study label to the thumbnail layout."""
-        study_date = self.format_study_date(dataset)
-        study_label = QLabel(study_date)
-        study_label.setObjectName("study_date_label")
-        study_label.setToolTip(f"Study UID: {study_uid}")
-        study_label.setMaximumHeight(20)
-        study_label.setAlignment(Qt.AlignCenter)
-        self.thumbnail_layout.addWidget(study_label, row, 0, 1, 2)
-
-    def format_study_date(self, dataset):
-        """Format the study date from DICOM format (YYYYMMDD) to a readable format."""
-        study_date = dataset.StudyDate if hasattr(dataset, "StudyDate") else "Unknown Date"
-        if study_date != "Unknown Date":
-            try:
-                return f"{study_date[6:8]}.{study_date[4:6]}.{study_date[0:4]}"
-            except IndexError:
-                return study_date
-        return study_date
-
-    def add_thumbnails_for_study(self, datasets, row):
-        """Add thumbnails for each dataset in the study group."""
-        for idx, (file_path, dataset) in enumerate(datasets):
-            thumbnail = self.create_thumbnail(file_path, dataset)
-            self.thumbnail_layout.addWidget(thumbnail, row, idx % 2)
-            if idx % 2 == 1:
-                row += 1
-        if len(datasets) % 2 == 1:
-            row += 1
-        return row
-
-    def create_horizontal_separator(self):
-        """Create a horizontal separator line."""
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setObjectName("study_separator")
-        separator.setFixedHeight(1)
-        return separator
-
-    def create_thumbnail(self, file_path, dataset):
-        """Create a thumbnail widget for a DICOM file."""
-        thumbnail = QPushButton()
-        thumbnail.setCheckable(True)  # Enable checkable state
-
-        # Store the file path as a property of the thumbnail
-        thumbnail.setProperty("file_path", file_path)
-
-        if hasattr(dataset, "pixel_array"):
-            try:
-                pixel_array = normalize_pixel_array(dataset.pixel_array)
-                image_viewer = ImageViewer()
-                image = image_viewer.create_qimage(pixel_array)
-                pixmap = QPixmap.fromImage(image)
-                pixmap = pixmap.scaled(THUMBNAIL_SIZE, Qt.KeepAspectRatio)
-                thumbnail.setIcon(QPixmap(pixmap))
-                thumbnail.setIconSize(THUMBNAIL_SIZE)
-            except ValueError as e:
-                print(f"Error creating thumbnail: {e}")
-                thumbnail.setText(Path(file_path).name)
-        else:
-            thumbnail.setText(Path(file_path).name)
-
-        return thumbnail
 
 
 class DicomExplorer(QMainWindow):
@@ -138,6 +39,9 @@ class DicomExplorer(QMainWindow):
         self.current_file = None
         self.study_groups = {}  # Dictionary to group datasets by StudyInstanceUID
         self.last_used_directory = str(Path.home())
+
+        # Initialize FileBrowserManager
+        self.file_browser_manager = FileBrowserManager(self)
 
         self.initialize_ui()
         self.setup_signal_slots()
@@ -232,9 +136,8 @@ class DicomExplorer(QMainWindow):
         # Deselect all thumbnails first
         for i in range(self.thumbnail_layout.count()):
             item = self.thumbnail_layout.itemAt(i)
-            if item and isinstance(item.widget(), QPushButton):
-                if item.widget() != thumbnail:
-                    item.widget().setChecked(False)
+            if item and isinstance(item.widget(), QPushButton) and item.widget() != thumbnail:
+                item.widget().setChecked(False)
 
         # Set the clicked thumbnail as selected
         thumbnail.setChecked(True)
@@ -323,65 +226,9 @@ class DicomExplorer(QMainWindow):
             else:
                 QMessageBox.warning(self, "Invalid File", f"File {file_path} is not a valid DICOM file.")
 
-
     def browse_file(self):
-        """Open one or more DICOM files with a custom preview widget."""
-        file_dialog = QFileDialog(self)
-        file_dialog.setWindowTitle("Select DICOM Files")
-        file_dialog.setDirectory(self.last_used_directory)
-        file_dialog.setNameFilter("DICOM files (*.dcm);;All files (*.*)")
-        file_dialog.setFileMode(QFileDialog.ExistingFiles)
-        file_dialog.setViewMode(QFileDialog.Detail)
-
-        app_width = self.width()
-        app_height = self.height()
-        dialog_width = int(app_width * 0.8)
-        dialog_height = int(app_height * 0.7)
-        file_dialog.setMinimumWidth(dialog_width)
-        file_dialog.setMinimumHeight(dialog_height)
-
-        # Removing sidebar
-        for child in file_dialog.findChildren(QWidget):
-            if "sidebar" in child.objectName().lower():
-                child.setParent(None)
-                break
-
-        preview_widget = QWidget()
-        preview_layout = QVBoxLayout(preview_widget)
-        preview_label = QLabel("Preview will appear here", preview_widget)
-        preview_label.setAlignment(Qt.AlignCenter)
-        preview_layout.addWidget(preview_label)
-
-        layout = file_dialog.layout()
-        layout.addWidget(preview_widget, 0, 3, 4, 1)
-
-        file_dialog.currentChanged.connect(lambda path: self.update_preview(preview_label, path))
-
-        if file_dialog.exec() == QFileDialog.Accepted:
-            file_names = file_dialog.selectedFiles()
-            self.last_used_directory = file_dialog.directory().absolutePath()  # Save last used dir
-
-            if file_names:
-                for file_name in file_names:
-                    self.load_dicom(file_name)
-
-    def update_preview(self, preview_label, path):
-        """Update the preview widget with the selected file."""
-        if path.lower().endswith(".dcm"):
-            try:
-                dataset = pydicom.dcmread(path)
-                if hasattr(dataset, "pixel_array"):
-                    pixel_array = normalize_pixel_array(dataset.pixel_array)
-                    image_viewer = ImageViewer()
-                    image = image_viewer.create_qimage(pixel_array)
-                    pixmap = QPixmap.fromImage(image)
-                    preview_label.setPixmap(pixmap.scaled(200, 200, Qt.KeepAspectRatio))
-                else:
-                    preview_label.setText("No image preview available.")
-            except Exception as e:
-                preview_label.setText(f"Error loading preview: {str(e)}")
-        else:
-            preview_label.setText("Preview not available for non-DICOM files.")
+        """Open one or more DICOM files using FileBrowserManager."""
+        self.file_browser_manager.browse_file()
 
     def load_dicom(self, file_path):
         """Load a DICOM file and add it to the dataset."""
