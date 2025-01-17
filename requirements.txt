@@ -1,4 +1,3 @@
-gdcm==1.1
 numpy==2.2.1
 pydicom==3.0.1
 pylibjpeg==2.0.1
@@ -6,4 +5,5 @@ pylibjpeg-libjpeg==2.3.0
 PySide6==6.8.1
 PySide6_Addons==6.8.1
 PySide6_Essentials==6.8.1
+python-gdcm==3.0.24.1
 shiboken6==6.8.1

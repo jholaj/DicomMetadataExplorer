@@ -26,7 +26,7 @@ DICOM Metadata Explorer is a graphical desktop application designed for viewing,
 
 4. Run the application:
    ```bash
-   python main.py
+   python src/main.py
 
 ## How to Use
 1. Launch the application.
