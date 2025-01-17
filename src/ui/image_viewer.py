@@ -55,12 +55,12 @@ class ImageViewer(QGraphicsView):
                 return
 
             pixel_array = normalize_pixel_array(dataset.pixel_array)
-            image = self._create_qimage(pixel_array)
+            image = self.create_qimage(pixel_array)
             self._setup_image_display(image)
         except Exception as e:
             print(f"Error displaying image: {e}")
 
-    def _create_qimage(self, pixel_array):
+    def create_qimage(self, pixel_array):
         """Create QImage from normalized pixel array."""
         if not isinstance(pixel_array, np.ndarray) or len(pixel_array.shape) != 2:
             raise ValueError("Invalid pixel array: Expected a 2D NumPy array")
