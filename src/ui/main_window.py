@@ -137,6 +137,7 @@ class DicomExplorer(QMainWindow):
         self.datasets = {}  # Dictionary to store opened DICOM datasets
         self.current_file = None
         self.study_groups = {}  # Dictionary to group datasets by StudyInstanceUID
+        self.last_used_directory = str(Path.home())
 
         self.initialize_ui()
         self.setup_signal_slots()
@@ -324,16 +325,63 @@ class DicomExplorer(QMainWindow):
 
 
     def browse_file(self):
-        """Open one or more DICOM files."""
-        file_names, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Select DICOM files",
-            str(Path.home()),
-            "DICOM files (*.dcm);;All files (*.*)",
-        )
-        if file_names:
-            for file_name in file_names:
-                self.load_dicom(file_name)
+        """Open one or more DICOM files with a custom preview widget."""
+        file_dialog = QFileDialog(self)
+        file_dialog.setWindowTitle("Select DICOM Files")
+        file_dialog.setDirectory(self.last_used_directory)
+        file_dialog.setNameFilter("DICOM files (*.dcm);;All files (*.*)")
+        file_dialog.setFileMode(QFileDialog.ExistingFiles)
+        file_dialog.setViewMode(QFileDialog.Detail)
+
+        app_width = self.width()
+        app_height = self.height()
+        dialog_width = int(app_width * 0.8)
+        dialog_height = int(app_height * 0.7)
+        file_dialog.setMinimumWidth(dialog_width)
+        file_dialog.setMinimumHeight(dialog_height)
+
+        # Removing sidebar
+        for child in file_dialog.findChildren(QWidget):
+            if "sidebar" in child.objectName().lower():
+                child.setParent(None)
+                break
+
+        preview_widget = QWidget()
+        preview_layout = QVBoxLayout(preview_widget)
+        preview_label = QLabel("Preview will appear here", preview_widget)
+        preview_label.setAlignment(Qt.AlignCenter)
+        preview_layout.addWidget(preview_label)
+
+        layout = file_dialog.layout()
+        layout.addWidget(preview_widget, 0, 3, 4, 1)
+
+        file_dialog.currentChanged.connect(lambda path: self.update_preview(preview_label, path))
+
+        if file_dialog.exec() == QFileDialog.Accepted:
+            file_names = file_dialog.selectedFiles()
+            self.last_used_directory = file_dialog.directory().absolutePath()  # Save last used dir
+
+            if file_names:
+                for file_name in file_names:
+                    self.load_dicom(file_name)
+
+    def update_preview(self, preview_label, path):
+        """Update the preview widget with the selected file."""
+        if path.lower().endswith(".dcm"):
+            try:
+                dataset = pydicom.dcmread(path)
+                if hasattr(dataset, "pixel_array"):
+                    pixel_array = normalize_pixel_array(dataset.pixel_array)
+                    image_viewer = ImageViewer()
+                    image = image_viewer.create_qimage(pixel_array)
+                    pixmap = QPixmap.fromImage(image)
+                    preview_label.setPixmap(pixmap.scaled(200, 200, Qt.KeepAspectRatio))
+                else:
+                    preview_label.setText("No image preview available.")
+            except Exception as e:
+                preview_label.setText(f"Error loading preview: {str(e)}")
+        else:
+            preview_label.setText("Preview not available for non-DICOM files.")
 
     def load_dicom(self, file_path):
         """Load a DICOM file and add it to the dataset."""
