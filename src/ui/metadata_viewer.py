@@ -1,12 +1,20 @@
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLineEdit, QTreeWidget,
-    QTreeWidgetItem, QHeaderView, QMessageBox, QMenu,
-    QDialog
-)
-from PySide6.QtCore import Qt
 from pydicom.sequence import Sequence
-from utils.dicom_utils import get_tag_value_str
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QDialog,
+    QHeaderView,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
 from ui.dialogs import EditTagDialog
+from utils.dicom_utils import get_tag_value_str
+
 
 class MetadataViewer(QWidget):
     def __init__(self, parent=None):
@@ -24,6 +32,9 @@ class MetadataViewer(QWidget):
         self.tree.setHeaderLabels(["Tag", "Name", "VR", "Value"])
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.show_context_menu)
+
+        # Connect double-click signal to edit_tag method
+        self.tree.itemDoubleClicked.connect(self.edit_tag)
 
         # Configure header resizing
         header = self.tree.header()
@@ -63,37 +74,38 @@ class MetadataViewer(QWidget):
 
     def edit_tag(self, item):
         """Edit the selected tag."""
-        dialog = EditTagDialog(item, self)
-        if dialog.exec() == QDialog.Accepted:
-            try:
-                tag_str = item.text(0)[1:-1]
-                group, element = map(lambda x: int(x, 16), tag_str.split(','))
-                tag = (group, element)
+        if isinstance(item, QTreeWidgetItem):  # Ensure the item is a QTreeWidgetItem
+            dialog = EditTagDialog(item, self)
+            if dialog.exec() == QDialog.Accepted:
+                try:
+                    tag_str = item.text(0)[1:-1]
+                    group, element = map(lambda x: int(x, 16), tag_str.split(','))
+                    tag = (group, element)
 
-                # Retrieve VR from data_element or item text
-                data_element = self.dataset.get(tag, None)
-                if data_element:
-                    vr = data_element.VR if hasattr(data_element, 'VR') else item.text(2)
-                else:
-                    vr = item.text(2)  # Fallback VR
+                    # Retrieve VR from data_element or item text
+                    data_element = self.dataset.get(tag, None)
+                    if data_element:
+                        vr = data_element.VR if hasattr(data_element, 'VR') else item.text(2)
+                    else:
+                        vr = item.text(2)  # Fallback VR
 
-                new_value = dialog.get_value()
+                    new_value = dialog.get_value()
 
-                # Use the recursive function to find and edit the tag
-                self.find_and_edit_tag(self.dataset, tag, new_value, vr)
+                    # Use the recursive function to find and edit the tag
+                    self.find_and_edit_tag(self.dataset, tag, new_value, vr)
 
-                # Update the item display
-                item.setText(3, str(new_value))
+                    # Update the item display
+                    item.setText(3, str(new_value))
 
-                if hasattr(self.window(), 'status_bar'):
-                    self.window().status_bar.showMessage(
-                        "Tag updated successfully", 3000
+                    if hasattr(self.window(), 'status_bar'):
+                        self.window().status_bar.showMessage(
+                            "Tag updated successfully", 3000
+                        )
+
+                except Exception as e:
+                    QMessageBox.warning(
+                        self, "Error", f"Failed to update tag {tag}: {str(e)}"
                     )
-
-            except Exception as e:
-                QMessageBox.warning(
-                    self, "Error", f"Failed to update tag {tag}: {str(e)}"
-                )
 
     def filter_items(self, text):
         """Filter tree items based on search text."""
