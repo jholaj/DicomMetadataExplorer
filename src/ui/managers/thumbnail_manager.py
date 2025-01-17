@@ -13,6 +13,7 @@ class ThumbnailManager:
     def __init__(self, thumbnail_panel, thumbnail_layout, datasets, study_groups):
         self.thumbnail_panel = thumbnail_panel
         self.thumbnail_layout = thumbnail_layout
+        self.main_window = thumbnail_panel.window()
         self.datasets = datasets
         self.study_groups = study_groups
 
@@ -103,5 +104,7 @@ class ThumbnailManager:
                 thumbnail.setText(Path(file_path).name)
         else:
             thumbnail.setText(Path(file_path).name)
+
+        thumbnail.clicked.connect(self.main_window.on_thumbnail_clicked)
 
         return thumbnail
