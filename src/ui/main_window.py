@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pydicom
+import pydicom.config
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
@@ -29,6 +30,8 @@ from ui.viewers.metadata_viewer import MetadataViewer
 
 # Constants
 ERROR_MESSAGE_TEMPLATE = "Error: {}"
+# Ignore invalid data and replace with UN
+pydicom.config.convert_wrong_length_to_UN = True
 
 
 class DicomExplorer(QMainWindow):
