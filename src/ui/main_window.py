@@ -290,6 +290,39 @@ class DicomExplorer(QMainWindow):
         self.zoom_label.setText(f"Zoom: {zoom_percentage}%")
         self.zoom_label.show()
 
+    def dragEnterEvent(self, event):
+        """Handle drag enter event."""
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        """Handle drag move event."""
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        """Handle file drop event."""
+        if event.mimeData().hasUrls():
+            event.setDropAction(Qt.CopyAction)
+            event.accept()
+            files = [url.toLocalFile() for url in event.mimeData().urls()]
+            self.handle_dropped_files(files)
+        else:
+            event.ignore()
+
+    def handle_dropped_files(self, files):
+        """Process dropped files."""
+        for file_path in files:
+            if Path(file_path).suffix.lower() == ".dcm":  # Check for DICOM files
+                self.load_dicom(file_path)
+            else:
+                QMessageBox.warning(self, "Invalid File", f"File {file_path} is not a valid DICOM file.")
+
+
     def browse_file(self):
         """Open one or more DICOM files."""
         file_names, _ = QFileDialog.getOpenFileNames(
