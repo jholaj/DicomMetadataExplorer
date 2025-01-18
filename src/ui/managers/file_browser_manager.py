@@ -7,7 +7,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFileDialog, QLabel, QVBoxLayout, QWidget
 
 from ui.viewers.image_viewer import ImageViewer
-from utils.dicom_utils import normalize_pixel_array
+from utils.dicom_properties import DicomImageProperties
 
 
 class FileBrowserManager:
@@ -64,8 +64,10 @@ class FileBrowserManager:
                 preview_label.setText("No image preview available.")
                 return
 
-            pixel_array = normalize_pixel_array(dataset.pixel_array)
-            image = self.image_viewer.create_qimage(pixel_array)
+            dicom_props = DicomImageProperties.from_dataset(dataset)
+            processed_pixels = dicom_props.get_processed_pixels()
+            image = self.image_viewer.create_qimage(processed_pixels)
+
             pixmap = QPixmap.fromImage(image)
             preview_label.setPixmap(pixmap.scaled(
                 self.PREVIEW_SIZE,

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QPushButton
 
 from constants import THUMBNAIL_SIZE
 from ui.viewers.image_viewer import ImageViewer
-from utils.dicom_utils import normalize_pixel_array
+from utils.dicom_properties import DicomImageProperties
 
 
 class ThumbnailManager:
@@ -92,9 +92,10 @@ class ThumbnailManager:
 
         if hasattr(dataset, "pixel_array"):
             try:
-                pixel_array = normalize_pixel_array(dataset.pixel_array)
+                dicom_props = DicomImageProperties.from_dataset(dataset)
                 image_viewer = ImageViewer()
-                image = image_viewer.create_qimage(pixel_array)
+                processed_pixels = dicom_props.get_processed_pixels()
+                image = image_viewer.create_qimage(processed_pixels)
                 pixmap = QPixmap.fromImage(image)
                 pixmap = pixmap.scaled(THUMBNAIL_SIZE, Qt.KeepAspectRatio)
                 thumbnail.setIcon(QPixmap(pixmap))

@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.dialogs import EditTagDialog
-from utils.dicom_utils import get_tag_value_str
+from utils.dicom_properties import get_tag_value_str
 
 
 class MetadataViewer(QWidget):

@@ -4,7 +4,7 @@ from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsView, QSizePolicy
 
 from constants import ZOOM_FACTOR
-from utils.dicom_utils import normalize_pixel_array
+from utils.dicom_properties import DicomImageProperties
 
 
 class ImageViewer(QGraphicsView):
@@ -56,9 +56,11 @@ class ImageViewer(QGraphicsView):
             if not hasattr(dataset, "pixel_array"):
                 return
 
-            pixel_array = normalize_pixel_array(dataset.pixel_array)
-            image = self.create_qimage(pixel_array)
+            dicom_props = DicomImageProperties.from_dataset(dataset)
+            processed_pixels = dicom_props.get_processed_pixels()
+            image = self.create_qimage(processed_pixels)
             self._setup_image_display(image)
+
         except Exception as e:
             print(f"Error displaying image: {e}")
 
@@ -66,7 +68,6 @@ class ImageViewer(QGraphicsView):
         """Create QImage from normalized pixel array."""
         if not isinstance(pixel_array, np.ndarray) or len(pixel_array.shape) != 2:
             raise ValueError("Invalid pixel array: Expected a 2D NumPy array")
-
         height, width = pixel_array.shape
         return QImage(pixel_array.data, width, height, width, QImage.Format_Grayscale8)
 
