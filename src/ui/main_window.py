@@ -26,6 +26,7 @@ from ui.managers.file_browser_manager import FileBrowserManager
 from ui.managers.thumbnail_manager import ThumbnailManager
 from ui.viewers.image_viewer import ImageViewer
 from ui.viewers.metadata_viewer import MetadataViewer
+from ui.viewers.tools_viewer import ToolsViewer
 
 # Constants
 ERROR_MESSAGE_TEMPLATE = "Error: {}"
@@ -87,8 +88,10 @@ class DicomExplorer(QMainWindow):
         self.tab_widget = QTabWidget()
         self.metadata_viewer = MetadataViewer()
         self.image_viewer = ImageViewer()
+        self.tools_viewer = ToolsViewer()
         self.tab_widget.addTab(self.metadata_viewer, "Metadata")
         self.tab_widget.addTab(self.image_viewer, "Content")
+        self.tab_widget.addTab(self.tools_viewer, "Tools")
         right_layout.addWidget(self.tab_widget)
 
         # Status bar

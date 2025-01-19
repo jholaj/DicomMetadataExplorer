@@ -224,3 +224,8 @@ class MetadataViewer(QWidget):
 
                 if sequence_items:
                     self.create_sequence_tree(sequence_items, item)
+
+    def refresh_metadata(self, file_path):
+        """Refresh metadata display for the modified dataset."""
+        if file_path in self.datasets:
+            self.metadata_viewer.load_metadata(self.datasets[file_path])
