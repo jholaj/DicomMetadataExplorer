@@ -1,13 +1,14 @@
 from pathlib import Path
-from typing import List, Optional
 
 import pydicom
+from pydicom.errors import InvalidDicomError
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFileDialog, QLabel, QVBoxLayout, QWidget
 
 from ui.viewers.image_viewer import ImageViewer
 from utils.dicom_properties import DicomImageProperties
+from utils.metadata_export import export_to_csv, export_to_json
 
 
 class FileBrowserManager:
@@ -17,11 +18,20 @@ class FileBrowserManager:
 
     def __init__(self, parent):
         self.parent = parent
-        self.last_used_directory = str(Path.home())
-        self.image_viewer = ImageViewer()
+        self.last_used_directory = str(parent.settings.value("last_directory", str(Path.home())))
 
-    def _setup_dialog(self, dialog: QFileDialog, title: str, file_mode: QFileDialog.FileMode,
-        accept_mode: QFileDialog.AcceptMode) -> None:
+    def _set_last_directory(self, dialog: QFileDialog) -> None:
+        """Remember the dialog's directory across sessions."""
+        self.last_used_directory = dialog.directory().absolutePath()
+        self.parent.settings.setValue("last_directory", self.last_used_directory)
+
+    def _setup_dialog(
+        self,
+        dialog: QFileDialog,
+        title: str,
+        file_mode: QFileDialog.FileMode,
+        accept_mode: QFileDialog.AcceptMode,
+    ) -> None:
         """Set basic dialog properties."""
         dialog.setWindowTitle(title)
         dialog.setDirectory(self.last_used_directory)
@@ -54,8 +64,8 @@ class FileBrowserManager:
 
     def _update_preview(self, preview_label: QLabel, path: str) -> None:
         """Update dicom file preview."""
-        if not path or not path.lower().endswith(".dcm"):
-            preview_label.setText("Preview not available for non-DICOM files.")
+        if not path or not Path(path).is_file():
+            preview_label.setText("Preview will appear here")
             return
 
         try:
@@ -66,23 +76,29 @@ class FileBrowserManager:
 
             dicom_props = DicomImageProperties.from_dataset(dataset)
             processed_pixels = dicom_props.get_processed_pixels()
-            image = self.image_viewer.create_qimage(processed_pixels)
+            image = ImageViewer.create_qimage(processed_pixels)
 
             pixmap = QPixmap.fromImage(image)
-            preview_label.setPixmap(pixmap.scaled(
-                self.PREVIEW_SIZE,
-                self.PREVIEW_SIZE,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            ))
+            preview_label.setPixmap(
+                pixmap.scaled(
+                    self.PREVIEW_SIZE,
+                    self.PREVIEW_SIZE,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+            )
+        except InvalidDicomError:
+            preview_label.setText("Not a DICOM file.")
         except Exception as e:
-            preview_label.setText(f"Error loading preview: {str(e)}")
+            preview_label.setText(f"Error loading preview: {e!s}")
 
-    def browse_file(self) -> Optional[List[str]]:
+    def browse_file(self) -> list[str] | None:
         """Open file dialog for selecting DICOM files."""
         try:
             dialog = QFileDialog(self.parent)
-            self._setup_dialog(dialog, "Select DICOM Files", QFileDialog.ExistingFiles, QFileDialog.AcceptOpen)
+            self._setup_dialog(
+                dialog, "Select DICOM Files", QFileDialog.ExistingFiles, QFileDialog.AcceptOpen
+            )
 
             # add preview
             preview_widget, preview_label = self._create_preview_widget()
@@ -91,18 +107,17 @@ class FileBrowserManager:
 
             if dialog.exec() == QFileDialog.Accepted:
                 file_names = dialog.selectedFiles()
-                self.last_used_directory = dialog.directory().absolutePath()
+                self._set_last_directory(dialog)
 
                 if file_names:
-                    for file_name in file_names:
-                        self.parent.load_dicom(file_name)
+                    self.parent.load_files(file_names)
                     return file_names
             return None
         except Exception as e:
             print(f"Error in browse_file: {e}")
             return None
 
-    def save_file(self, dataset: pydicom.Dataset, current_file: str) -> Optional[str]:
+    def save_file(self, dataset: pydicom.Dataset, current_file: str) -> str | None:
         """Save DICOM file."""
         if not dataset or not current_file:
             self.parent.status_bar.showMessage("No DICOM file loaded")
@@ -110,26 +125,66 @@ class FileBrowserManager:
 
         try:
             dialog = QFileDialog(self.parent)
-            self._setup_dialog(dialog, "Save DICOM File", QFileDialog.AnyFile, QFileDialog.AcceptSave)
+            self._setup_dialog(
+                dialog, "Save DICOM File", QFileDialog.AnyFile, QFileDialog.AcceptSave
+            )
 
             if dialog.exec() == QFileDialog.Accepted:
                 file_name = dialog.selectedFiles()[0]
                 if not file_name.lower().endswith(".dcm"):
                     file_name += ".dcm"
 
-                self.last_used_directory = dialog.directory().absolutePath()
+                self._set_last_directory(dialog)
 
                 try:
                     dataset.save_as(file_name)
                     self.parent.status_bar.showMessage(
-                        f"File saved successfully to {file_name}",
-                        3000
+                        f"File saved successfully to {file_name}", 3000
                     )
                     return file_name
                 except Exception as e:
-                    self.parent.show_error_message(f"Failed to save file: {str(e)}")
+                    self.parent.show_error_message(f"Failed to save file: {e!s}")
                     return None
             return None
         except Exception as e:
             print(f"Error in save_file: {e}")
+            return None
+
+    def export_metadata(self, dataset: pydicom.Dataset, current_file: str) -> str | None:
+        """Export metadata of the current DICOM file to JSON or CSV."""
+        if not dataset or not current_file:
+            self.parent.status_bar.showMessage("No DICOM file loaded")
+            return None
+
+        try:
+            dialog = QFileDialog(self.parent)
+            self._setup_dialog(
+                dialog, "Export Metadata", QFileDialog.AnyFile, QFileDialog.AcceptSave
+            )
+            dialog.setNameFilter("JSON (*.json);;CSV (*.csv)")
+            dialog.selectFile(f"{Path(current_file).stem}_metadata.json")
+
+            if dialog.exec() != QFileDialog.Accepted:
+                return None
+
+            file_name = dialog.selectedFiles()[0]
+            self._set_last_directory(dialog)
+
+            suffix = Path(file_name).suffix.lower()
+            if suffix not in (".json", ".csv"):
+                suffix = ".csv" if "CSV" in dialog.selectedNameFilter() else ".json"
+                file_name += suffix
+
+            try:
+                if suffix == ".csv":
+                    export_to_csv(dataset, file_name)
+                else:
+                    export_to_json(dataset, file_name)
+                self.parent.status_bar.showMessage(f"Metadata exported to {file_name}", 3000)
+                return file_name
+            except Exception as e:
+                self.parent.show_error_message(f"Failed to export metadata: {e!s}")
+                return None
+        except Exception as e:
+            print(f"Error in export_metadata: {e}")
             return None

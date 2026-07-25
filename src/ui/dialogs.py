@@ -1,4 +1,165 @@
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit
+from pathlib import Path
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+)
+
+from styles.theme import SELECTED_COLOR
+from utils.dicom_properties import get_tag_value_str
+
+
+class CompareMetadataDialog(QDialog):
+    """Dialog comparing metadata of two loaded DICOM files side by side."""
+
+    MISSING = "-"
+
+    def __init__(self, datasets, current_file, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Compare Metadata")
+        self.datasets = datasets
+        self.resize(900, 600)
+
+        layout = QVBoxLayout(self)
+
+        # File selectors
+        selector_row = QHBoxLayout()
+        self.combo_a = QComboBox()
+        self.combo_b = QComboBox()
+        for path in datasets:
+            for combo in (self.combo_a, self.combo_b):
+                combo.addItem(Path(path).name, path)
+                combo.setItemData(combo.count() - 1, path, Qt.ToolTipRole)
+
+        paths = list(datasets)
+        self.combo_a.setCurrentIndex(paths.index(current_file))
+        other = next((i for i, p in enumerate(paths) if p != current_file), 0)
+        self.combo_b.setCurrentIndex(other)
+
+        selector_row.addWidget(QLabel("File A:"))
+        selector_row.addWidget(self.combo_a, stretch=1)
+        selector_row.addSpacing(12)
+        selector_row.addWidget(QLabel("File B:"))
+        selector_row.addWidget(self.combo_b, stretch=1)
+        layout.addLayout(selector_row)
+
+        self.diff_only = QCheckBox("Show only differences")
+        self.diff_only.setChecked(True)
+        layout.addWidget(self.diff_only)
+
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["Tag", "Name", "File A", "File B"])
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setRootIsDecorated(False)
+        header = self.tree.header()
+        for i in range(4):
+            header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        layout.addWidget(self.tree)
+
+        self.summary_label = QLabel()
+        layout.addWidget(self.summary_label)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Close)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+        self.combo_a.currentIndexChanged.connect(self.populate)
+        self.combo_b.currentIndexChanged.connect(self.populate)
+        self.diff_only.toggled.connect(self.populate)
+        self.populate()
+
+    @staticmethod
+    def _tag_values(dataset):
+        """Map (group, element) -> (tag string, name, value string)."""
+        values = {}
+        for elem in dataset:
+            if elem.tag.group == 0x7FE0:
+                continue
+            value_str, _ = get_tag_value_str(elem)
+            key = (elem.tag.group, elem.tag.element)
+            tag_str = f"({elem.tag.group:04x},{elem.tag.element:04x})"
+            values[key] = (tag_str, elem.name or "", value_str)
+        return values
+
+    def populate(self):
+        """Fill the tree with the union of tags from both files."""
+        self.tree.clear()
+        ds_a = self.datasets.get(self.combo_a.currentData())
+        ds_b = self.datasets.get(self.combo_b.currentData())
+        if ds_a is None or ds_b is None:
+            return
+
+        values_a = self._tag_values(ds_a)
+        values_b = self._tag_values(ds_b)
+        highlight = QColor(SELECTED_COLOR)
+
+        differences = 0
+        for key in sorted(set(values_a) | set(values_b)):
+            tag_str, name, value_a = values_a.get(key, (None, None, self.MISSING))
+            tag_b, name_b, value_b = values_b.get(key, (None, None, self.MISSING))
+            tag_str = tag_str or tag_b
+            name = name or name_b
+
+            differs = value_a != value_b
+            if differs:
+                differences += 1
+            elif self.diff_only.isChecked():
+                continue
+
+            item = QTreeWidgetItem([tag_str, name, value_a, value_b])
+            if differs:
+                for column in range(4):
+                    item.setBackground(column, highlight)
+            self.tree.addTopLevelItem(item)
+
+        total = len(set(values_a) | set(values_b))
+        self.summary_label.setText(f"{differences} of {total} tags differ")
+
+
+class AddTagDialog(QDialog):
+    """Dialog for adding a new DICOM tag to the dataset."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add DICOM Tag")
+
+        layout = QFormLayout(self)
+        self.tag_edit = QLineEdit()
+        self.tag_edit.setPlaceholderText("Keyword (PatientName) or group,element (0010,0010)")
+        self.vr_edit = QLineEdit()
+        self.vr_edit.setPlaceholderText("Auto (from dictionary)")
+        self.vr_edit.setMaxLength(2)
+        self.value_edit = QLineEdit()
+
+        layout.addRow("Tag:", self.tag_edit)
+        layout.addRow("VR:", self.vr_edit)
+        layout.addRow("Value:", self.value_edit)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addRow(button_box)
+
+    def get_tag_text(self):
+        return self.tag_edit.text().strip()
+
+    def get_vr(self):
+        return self.vr_edit.text().strip().upper()
+
+    def get_value(self):
+        return self.value_edit.text()
 
 
 class EditTagDialog(QDialog):
@@ -15,9 +176,7 @@ class EditTagDialog(QDialog):
         layout.addRow("VR:", QLabel(tag_item.text(2)))
         layout.addRow("Value:", self.value_edit)
 
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        )
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addRow(button_box)
