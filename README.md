@@ -6,7 +6,7 @@ DICOM Metadata Explorer is a graphical desktop application designed for viewing,
 - **Load, Edit & Save DICOM Files**: Easily load, edit one or more DICOM files and save them as needed — via the Open dialog, recent files menu, drag & drop, or command-line arguments (`python src/main.py file.dcm folder/`). Unsaved changes are marked in the window title and guarded by confirmation dialogs; files or whole studies can be closed from the thumbnail context menu.
 - **Save All**: Save every modified file in one step (`Ctrl+Shift+S`) — in place, or as copies into a chosen folder (handy after batch anonymization).
 - **Thumbnail View**: The resizable left panel groups files by study, sorted by `StudyInstanceUID` (thumbnails within a study by instance number). Thumbnails are decoded in background threads, so loading many files does not freeze the UI.
-- **Metadata Viewer**: Viewer & editor for DICOM tags — add, edit, and delete tags with undo (`Ctrl+Z`), copy values (`Ctrl+C`), search across sequences.
+- **Metadata Viewer**: Viewer & editor for DICOM tags — add tags via the **+ Add Tag** button (`Ctrl+T`) with keyword autocompletion, automatic VR lookup, and a VR picker for private tags; edit and delete tags with undo (`Ctrl+Z`), copy values (`Ctrl+C`), search across sequences.
 - **Metadata Export**: Export all tags of a file to JSON or CSV (`Ctrl+E`).
 - **Anonymization**: Remove person names, identifying tags, and private tags from the current file or all loaded files at once.
 - **Compare Files**: Side-by-side metadata comparison of two loaded files with differences highlighted.

@@ -97,6 +97,17 @@ def app_icon():
     return QIcon(pixmap)
 
 
+def add_icon():
+    """Plus sign."""
+
+    def draw(p):
+        p.setPen(QPen(QColor("#ffffff"), 3.4, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        p.drawLine(20, 9, 20, 31)
+        p.drawLine(9, 20, 31, 20)
+
+    return _make_icon(draw)
+
+
 def export_icon():
     """Arrow up out of a tray."""
 

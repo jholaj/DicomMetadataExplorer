@@ -1,10 +1,13 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from pydicom.datadict import DicomDictionary, dictionary_description, dictionary_VR, tag_for_keyword
+from pydicom.tag import Tag
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QCompleter,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -17,8 +20,29 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from styles.theme import SELECTED_COLOR
+from styles.icons import add_icon
+from styles.theme import SELECTED_COLOR, TEXT_MUTED_COLOR
 from utils.dicom_properties import get_tag_value_str
+
+
+def resolve_tag(text):
+    """Resolve user input (keyword or 'group,element') to a pydicom Tag.
+
+    Returns None when the input matches neither a dictionary keyword
+    nor a hexadecimal group,element pair.
+    """
+    keyword_tag = tag_for_keyword(text)
+    if keyword_tag is not None:
+        return Tag(keyword_tag)
+
+    cleaned = text.strip().strip("()")
+    if "," in cleaned:
+        try:
+            group, element = (int(part.strip(), 16) for part in cleaned.split(",", 1))
+            return Tag(group, element)
+        except ValueError:
+            return None
+    return None
 
 
 class CompareMetadataDialog(QDialog):
@@ -131,32 +155,104 @@ class CompareMetadataDialog(QDialog):
 class AddTagDialog(QDialog):
     """Dialog for adding a new DICOM tag to the dataset."""
 
+    # All keywords from the DICOM dictionary, for autocompletion
+    _KEYWORDS = sorted({entry[4] for entry in DicomDictionary.values() if entry[4]})
+
+    # Common VRs offered for private/unknown tags
+    VR_CHOICES = (
+        ("LO", "Long String (text, up to 64 chars)"),
+        ("SH", "Short String (text, up to 16 chars)"),
+        ("LT", "Long Text"),
+        ("IS", "Integer String"),
+        ("DS", "Decimal String"),
+        ("US", "Unsigned Short (binary integer)"),
+        ("UL", "Unsigned Long (binary integer)"),
+        ("FL", "Float"),
+        ("FD", "Double"),
+        ("CS", "Code String"),
+        ("DA", "Date (YYYYMMDD)"),
+        ("TM", "Time (HHMMSS)"),
+        ("DT", "DateTime"),
+        ("PN", "Person Name"),
+        ("UI", "Unique Identifier"),
+        ("UN", "Unknown (raw bytes)"),
+    )
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Add DICOM Tag")
+        self.setMinimumWidth(420)
 
         layout = QFormLayout(self)
         self.tag_edit = QLineEdit()
         self.tag_edit.setPlaceholderText("Keyword (PatientName) or group,element (0010,0010)")
-        self.vr_edit = QLineEdit()
-        self.vr_edit.setPlaceholderText("Auto (from dictionary)")
-        self.vr_edit.setMaxLength(2)
+
+        completer = QCompleter(self._KEYWORDS, self)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)
+        self.tag_edit.setCompleter(completer)
+
+        self.hint_label = QLabel(" ")
+        self.hint_label.setStyleSheet(f"color: {TEXT_MUTED_COLOR}; font-size: 12px;")
+
+        self.vr_edit = QComboBox()
+        self.vr_edit.setEditable(True)
+        self.vr_edit.addItem("")  # empty = resolve from dictionary
+        for index, (code, description) in enumerate(self.VR_CHOICES, start=1):
+            self.vr_edit.addItem(code)
+            self.vr_edit.setItemData(index, description, Qt.ToolTipRole)
+        self.vr_edit.lineEdit().setPlaceholderText("Auto (from dictionary)")
+        self.vr_edit.lineEdit().setMaxLength(2)
         self.value_edit = QLineEdit()
 
         layout.addRow("Tag:", self.tag_edit)
+        layout.addRow("", self.hint_label)
         layout.addRow("VR:", self.vr_edit)
         layout.addRow("Value:", self.value_edit)
 
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        add_button = button_box.button(QDialogButtonBox.Ok)
+        add_button.setText("Add")
+        add_button.setIcon(add_icon())
+        add_button.setIconSize(QSize(12, 12))
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addRow(button_box)
+
+        self.tag_edit.textChanged.connect(self._update_hint)
+        self.tag_edit.setFocus()
+
+    def _update_hint(self, text):
+        """Show the resolved tag, VR, and name for the current input."""
+        text = text.strip()
+        if not text:
+            self.hint_label.setText(" ")
+            return
+
+        tag = resolve_tag(text)
+        if tag is None:
+            self.hint_label.setText("Unknown tag - enter a keyword or group,element")
+            return
+
+        try:
+            vr = dictionary_VR(tag)
+            description = dictionary_description(tag)
+            self.hint_label.setText(
+                f"({tag.group:04x},{tag.element:04x})  VR {vr}  -  {description}"
+            )
+            if not self.get_vr():
+                self.vr_edit.lineEdit().setPlaceholderText(f"Auto ({vr})")
+        except KeyError:
+            self.hint_label.setText(
+                f"({tag.group:04x},{tag.element:04x})  private/unknown tag - "
+                "pick a VR (IS for integers, LO for text)"
+            )
 
     def get_tag_text(self):
         return self.tag_edit.text().strip()
 
     def get_vr(self):
-        return self.vr_edit.text().strip().upper()
+        return self.vr_edit.currentText().strip().upper()
 
     def get_value(self):
         return self.value_edit.text()

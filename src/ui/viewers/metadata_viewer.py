@@ -1,22 +1,24 @@
-from pydicom.datadict import dictionary_VR, tag_for_keyword
+from pydicom.datadict import dictionary_VR
 from pydicom.sequence import Sequence
-from pydicom.tag import Tag
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
+    QHBoxLayout,
     QHeaderView,
     QLineEdit,
     QMenu,
     QMessageBox,
+    QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from ui.dialogs import AddTagDialog, EditTagDialog
+from styles.icons import add_icon
+from ui.dialogs import AddTagDialog, EditTagDialog, resolve_tag
 from utils.dicom_properties import get_tag_value_str
 
 
@@ -26,6 +28,12 @@ def convert_value_for_vr(value, vr):
         return float(value)
     if vr in ("IS", "SL", "SS", "UL", "US"):
         return int(value)
+    if vr in ("UN", "OB", "OW"):
+        # Binary VRs are stored as raw bytes, padded to even length
+        data = value.encode() if isinstance(value, str) else bytes(value)
+        if len(data) % 2:
+            data += b"\x00"
+        return data
     return value
 
 
@@ -37,15 +45,27 @@ class MetadataViewer(QWidget):
         layout = QVBoxLayout(self)
         self.dataset = None
 
-        # Search input
+        # Search input + add-tag button
+        top_row = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search by tag name or value... (Ctrl+F)")
         self.search_input.setClearButtonEnabled(True)
-        layout.addWidget(self.search_input)
+        top_row.addWidget(self.search_input, stretch=1)
+
+        self.add_tag_button = QPushButton(add_icon(), "Add Tag")
+        self.add_tag_button.setIconSize(QSize(14, 14))
+        self.add_tag_button.setToolTip("Add a new DICOM tag (Ctrl+T)")
+        self.add_tag_button.clicked.connect(self.add_tag)
+        top_row.addWidget(self.add_tag_button)
+        layout.addLayout(top_row)
 
         # Focus search input with Ctrl+F
         search_shortcut = QShortcut(QKeySequence.Find, self)
         search_shortcut.activated.connect(self.focus_search)
+
+        # Add a tag with Ctrl+T
+        add_tag_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
+        add_tag_shortcut.activated.connect(self.add_tag)
 
         # Undo tag operations with Ctrl+Z
         self.undo_stack = []
@@ -131,6 +151,7 @@ class MetadataViewer(QWidget):
     def add_tag(self):
         """Add a new tag to the dataset."""
         if self.dataset is None:
+            self._show_status("No DICOM file loaded")
             return
 
         dialog = AddTagDialog(self)
@@ -142,7 +163,7 @@ class MetadataViewer(QWidget):
             return
 
         try:
-            tag = self._resolve_tag(tag_text)
+            tag = resolve_tag(tag_text)
             if tag is None:
                 QMessageBox.warning(
                     self,
@@ -180,22 +201,6 @@ class MetadataViewer(QWidget):
 
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to add tag: {e!s}")
-
-    @staticmethod
-    def _resolve_tag(text):
-        """Resolve user input (keyword or 'group,element') to a pydicom Tag."""
-        keyword_tag = tag_for_keyword(text)
-        if keyword_tag is not None:
-            return Tag(keyword_tag)
-
-        cleaned = text.strip().strip("()")
-        if "," in cleaned:
-            try:
-                group, element = (int(part.strip(), 16) for part in cleaned.split(",", 1))
-                return Tag(group, element)
-            except ValueError:
-                return None
-        return None
 
     def delete_tag(self, item):
         """Delete the selected tag from the dataset."""
