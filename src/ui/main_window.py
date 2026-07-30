@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSplitter,
+    QStackedWidget,
     QStatusBar,
     QTabWidget,
     QToolBar,
@@ -35,6 +36,7 @@ from ui.managers.thumbnail_manager import ThumbnailManager
 from ui.viewers.image_viewer import ImageViewer
 from ui.viewers.metadata_viewer import MetadataViewer
 from ui.viewers.overview_viewer import OverviewViewer
+from ui.viewers.report_viewer import ReportViewer
 from utils.anonymizer import anonymize_dataset
 from utils.dicom_properties import frame_count
 
@@ -178,13 +180,20 @@ class DicomExplorer(QMainWindow):
         self.setStyleSheet(get_application_style())
 
     def build_content_tab(self):
-        """Wrap the image viewer with image tools and a frame slider."""
+        """Wrap the image viewer with image tools, a frame slider, and
+        an alternative report view for structured reports."""
         content_tab = QWidget()
         layout = QVBoxLayout(content_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
-        layout.addWidget(self.build_image_tools_bar())
-        layout.addWidget(self.image_viewer)
+        self.image_tools_bar = self.build_image_tools_bar()
+        layout.addWidget(self.image_tools_bar)
+
+        self.report_viewer = ReportViewer()
+        self.content_stack = QStackedWidget()
+        self.content_stack.addWidget(self.image_viewer)
+        self.content_stack.addWidget(self.report_viewer)
+        layout.addWidget(self.content_stack)
 
         self.frame_bar = QWidget()
         bar_layout = QHBoxLayout(self.frame_bar)
@@ -391,8 +400,17 @@ class DicomExplorer(QMainWindow):
 
         if hasattr(dataset, "pixel_array"):
             self.image_viewer.display_image(dataset)
+            self.content_stack.setCurrentWidget(self.image_viewer)
+            self.image_tools_bar.show()
+        elif ReportViewer.is_report(dataset):
+            self.image_viewer.clear()
+            self.report_viewer.load_report(dataset)
+            self.content_stack.setCurrentWidget(self.report_viewer)
+            self.image_tools_bar.hide()
         else:
             self.image_viewer.clear()
+            self.content_stack.setCurrentWidget(self.image_viewer)
+            self.image_tools_bar.show()
 
         self.update_status_bar(self.tab_widget.currentIndex())
 
@@ -401,6 +419,9 @@ class DicomExplorer(QMainWindow):
         self.file_path.clear()
         self.metadata_viewer.clear()
         self.image_viewer.clear()
+        self.report_viewer.clear()
+        self.content_stack.setCurrentWidget(self.image_viewer)
+        self.image_tools_bar.show()
         self.overview_viewer.clear()
         self._update_window_title()
         self.status_bar.showMessage("No DICOM file loaded")
@@ -514,6 +535,11 @@ class DicomExplorer(QMainWindow):
             else:
                 self.zoom_label.hide()
                 self.wl_label.hide()
+                if ReportViewer.is_report(dataset):
+                    items = len(dataset.ContentSequence)
+                    self.status_bar.showMessage(
+                        f"Structured report - {items} top-level content item(s)"
+                    )
 
         elif index == 2:  # Overview tab
             self.zoom_label.hide()

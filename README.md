@@ -11,6 +11,7 @@ DICOM Metadata Explorer is a graphical desktop application designed for viewing,
 - **Anonymization**: Remove person names, identifying tags, and private tags from the current file or all loaded files at once.
 - **Compare Files**: Side-by-side metadata comparison of two loaded files with differences highlighted.
 - **Image Viewer**: A tools bar with Fit / 1:1 / rotate / flip / invert / reset W/L / copy view / save as PNG (all with keyboard shortcuts), zoom (`+`/`-`/`0`/`1` or mouse wheel), pan, multi-frame files with a frame slider, interactive window/level (right mouse drag, `R` to reset), pixel value under cursor, and distance measurement (`Shift` + left drag, `Esc` to remove).
+- **Structured Reports**: SR files (text reports) are rendered as a readable document in the Content tab — nested sections, text, measurements with units, codes, and references.
 - **Overview & Validation**: A readable summary of the file (patient, study, image, equipment, transfer syntax, pixel statistics) plus automatic consistency checks — missing required tags, pixel data length, bit depth consistency, photometric interpretation, window values, and more.
 
 ## Installation

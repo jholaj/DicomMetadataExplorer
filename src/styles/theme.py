@@ -109,6 +109,14 @@ def get_application_style():
             border: 2px solid {ACCENT_COLOR};
         }}
 
+        /* Report / text views */
+        QTextBrowser {{
+            background-color: {SURFACE_COLOR};
+            border: 1px solid {BORDER_COLOR};
+            border-radius: 6px;
+            padding: 12px;
+        }}
+
         /* Image tools hint */
         QLabel#image_tools_hint {{
             color: {TEXT_MUTED_COLOR};
