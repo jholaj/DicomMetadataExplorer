@@ -1,69 +1,40 @@
 # DICOM Metadata Explorer
 
-DICOM Metadata Explorer is a graphical desktop application designed for viewing, managing, and analyzing DICOM files.
+Desktop app for viewing, editing, validating and anonymizing DICOM files.
 
 ## Features
-- **Load, Edit & Save DICOM Files**: Easily load, edit one or more DICOM files and save them as needed — via the Open dialog, recent files menu, drag & drop, or command-line arguments (`python src/main.py file.dcm folder/`). Unsaved changes are marked in the window title and guarded by confirmation dialogs; files or whole studies can be closed from the thumbnail context menu.
-- **Save All**: Save every modified file in one step (`Ctrl+Shift+S`) — in place, or as copies into a chosen folder (handy after batch anonymization).
-- **Thumbnail View**: The resizable left panel groups files by study, sorted by `StudyInstanceUID` (thumbnails within a study by instance number). Thumbnails are decoded in background threads, so loading many files does not freeze the UI.
-- **Metadata Viewer**: Viewer & editor for DICOM tags — add tags via the **+ Add Tag** button (`Ctrl+T`) with keyword autocompletion, automatic VR lookup, and a VR picker for private tags; edit and delete tags with undo (`Ctrl+Z`), copy values (`Ctrl+C`), search across sequences.
-- **Metadata Export**: Export all tags of a file to JSON or CSV (`Ctrl+E`).
-- **Anonymization**: Remove person names, identifying tags, and private tags from the current file or all loaded files at once.
-- **Compare Files**: Side-by-side metadata comparison of two loaded files with differences highlighted.
-- **Image Viewer**: A tools bar with Fit / 1:1 / rotate / flip / invert / reset W/L / copy view / save as PNG (all with keyboard shortcuts), zoom (`+`/`-`/`0`/`1` or mouse wheel), pan, multi-frame files with a frame slider, interactive window/level (right mouse drag, `R` to reset), pixel value under cursor, and distance measurement (`Shift` + left drag, `Esc` to remove).
-- **Structured Reports**: SR files (text reports) are rendered as a readable document in the Content tab — nested sections, text, measurements with units, codes, and references.
-- **Overview & Validation**: A readable summary of the file (patient, study, image, equipment, transfer syntax, pixel statistics) plus automatic consistency checks — missing required tags, pixel data length, bit depth consistency, photometric interpretation, window values, and more.
+- Metadata tree with nested sequences, search, VR validated editing and undo per file
+- Bulk editing of tags that are the same in all files of a study
+- Image viewer with window/level, MONOCHROME1 support, zoom, measurement and multi-frame browsing
+- Validation of required attributes, value formats and consistency between the loaded files
+- Anonymization by the DICOM basic confidentiality profile
+- Structured report view, metadata comparison and export to JSON, CSV or DICOM JSON
 
-## Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/jholaj/DicomMetadataExplorer.git
-   cd DicomMetadataExplorer
-
-2. Set up a Python virtual environment (optional but recommended):
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-3. Install the project (dependencies are defined in `pyproject.toml`):
-   ```bash
-   pip install -e .
-
-4. Run the application:
-   ```bash
-   python src/main.py
-
-## Development
-
-Linting and formatting are handled by [ruff](https://docs.astral.sh/ruff/) (configured in `pyproject.toml`):
+## Install and run
 ```bash
-pip install ruff
-ruff format src
-ruff check src --fix
+uv sync
+uv run dicom-explorer [files or folders]
 ```
 
-## How to Use
-1. Launch the application.
-2. Use the Open button on the toolbar (`Ctrl+O`) to load one or more DICOM files, or drag & drop files or whole folders into the window (files without the `.dcm` extension are detected automatically).
-3. View thumbnails in the left panel. Click a thumbnail to display its content and metadata.
-4. Switch between the Metadata and Content tabs to explore the file. Use `Ctrl+F` to search tags, including values inside sequences. Right-click in the metadata view to add, edit, or delete tags.
-5. In the Content tab, adjust brightness/contrast (window/level) by dragging with the right mouse button; press `R` to reset, `+`/`-` to zoom, and `0` to fit the image to the window.
-6. Save changes using the Save button (`Ctrl+S`), or export metadata to JSON/CSV (`Ctrl+E`).
+Without uv, `pip install -e .` in a virtual environment and run `dicom-explorer`.
+
+## Development
+```bash
+uv run pytest
+uv run ruff format src tests
+uv run ruff check src tests
+```
 
 ## Screenshots
-#### Metadata viewer/editor
-![Metadata viewer](static/metadata.png)
-#### Content viewer
-![Content viewer](static/content.png)
-#### Overview & validation
-![Overview](static/overview.png)
+![Metadata editor](static/metadata-editor.png)
+![Image viewer](static/image-viewer.png)
+![Validation](static/validation.png)
 
 ## Notes
-- The viewer supports grayscale images (CR/DX and similar) as well as color (RGB/YBR) images such as secondary captures; window/level applies to grayscale only.
-- The application supports DICOM files with uncompressed pixel data or those compressed using supported formats (e.g., JPEG Lossless). Ensure dependencies like `pylibjpeg` or `gdcm` are installed for proper handling of compressed files.
-- Thumbnail generation may fail for some DICOM files without valid pixel data or unsupported compression.
-- This tool is for research and educational purposes; it is not suitable for clinical decision-making.
+> [!NOTE]
+> A series of single frame files, typical for CT and MR, opens as separate files. Scrolling through a series as one stack, similar to Weasis, is planned.
+
+Anonymization does not remove text burned into the pixel data. The app is meant for research and education, not for clinical use.
 
 ## License
-This project is licensed under the MIT License.
+MIT
