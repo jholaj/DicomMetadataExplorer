@@ -37,4 +37,4 @@ uv run ruff check src tests
 Anonymization does not remove text burned into the pixel data. The app is meant for research and education, not for clinical use.
 
 ## License
-MIT
+MIT, see [LICENSE.md](LICENSE.md).
