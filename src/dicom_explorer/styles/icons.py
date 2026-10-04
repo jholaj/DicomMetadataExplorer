@@ -1,10 +1,16 @@
-"""Simple line icons drawn with QPainter, so they are always visible
-on the dark theme regardless of the platform icon set."""
+"""Line icons drawn with QPainter for the dark theme."""
 
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap
 
-from styles.theme import ACCENT_COLOR, TEXT_COLOR
+from dicom_explorer.styles.theme import (
+    ACCENT_COLOR,
+    BORDER_COLOR,
+    SURFACE_COLOR,
+    TEXT_COLOR,
+    TEXT_MUTED_COLOR,
+    WARNING_COLOR,
+)
 
 # Icons are drawn in a 40x40 coordinate space and scaled down by the toolbar
 _CANVAS = 40
@@ -77,7 +83,7 @@ def save_all_icon():
 
 
 def app_icon():
-    """Application icon - accent tile with 'Dx'."""
+    """Accent tile with Dx."""
     pixmap = QPixmap(64, 64)
     pixmap.fill(Qt.transparent)
 
@@ -147,3 +153,40 @@ def compare_icon():
         p.drawRoundedRect(QRectF(22, 9, 11, 22), 2, 2)
 
     return _make_icon(draw)
+
+
+def validate_icon():
+    """Clipboard with a check mark."""
+
+    def draw(p):
+        p.drawRoundedRect(QRectF(9, 8, 22, 26), 3, 3)
+        p.drawLine(15, 8, 25, 8)
+        path = QPainterPath()
+        path.moveTo(14, 21)
+        path.lineTo(18.5, 25.5)
+        path.lineTo(26, 16)
+        p.drawPath(path)
+
+    return _make_icon(draw)
+
+
+def placeholder_thumbnail(text: str, warning: bool = False) -> QIcon:
+    """Thumbnail placeholder with a short text."""
+    pixmap = QPixmap(128, 128)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor(BORDER_COLOR), 3))
+    painter.setBrush(QColor(SURFACE_COLOR))
+    painter.drawRoundedRect(QRectF(6, 6, 116, 116), 14, 14)
+
+    font = QFont()
+    font.setPixelSize(36)
+    font.setBold(True)
+    painter.setFont(font)
+    painter.setPen(QColor(WARNING_COLOR if warning else TEXT_MUTED_COLOR))
+    painter.drawText(QRectF(6, 6, 116, 116), Qt.AlignCenter, text)
+    painter.end()
+
+    return QIcon(pixmap)

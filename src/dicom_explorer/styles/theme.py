@@ -1,3 +1,7 @@
+"""Dark theme: colors via QPalette (Fusion style), details via a stylesheet."""
+
+from PySide6.QtGui import QColor, QPalette
+
 # COLORS
 BACKGROUND_COLOR = "#15181b"
 SURFACE_COLOR = "#1e2328"
@@ -11,36 +15,73 @@ ACCENT_PRESSED_COLOR = "#265bb0"
 HOVER_COLOR = "#2a313a"
 SELECTED_COLOR = "#264a7a"
 DISABLED_COLOR = "#3a4149"
+VIEWER_BACKGROUND = "#101214"
+
+# Status colors (always combined with a symbol or text, never color alone)
+OK_COLOR = "#2fb344"
+WARNING_COLOR = "#fab219"
+ERROR_COLOR = "#e5484d"
+
+
+def application_palette() -> QPalette:
+    palette = QPalette()
+    colors = {
+        QPalette.Window: BACKGROUND_COLOR,
+        QPalette.WindowText: TEXT_COLOR,
+        QPalette.Base: SURFACE_COLOR,
+        QPalette.AlternateBase: SURFACE_ALT_COLOR,
+        QPalette.ToolTipBase: SURFACE_ALT_COLOR,
+        QPalette.ToolTipText: TEXT_COLOR,
+        QPalette.PlaceholderText: TEXT_MUTED_COLOR,
+        QPalette.Text: TEXT_COLOR,
+        QPalette.Button: SURFACE_COLOR,
+        QPalette.ButtonText: TEXT_COLOR,
+        QPalette.BrightText: "#ffffff",
+        QPalette.Highlight: SELECTED_COLOR,
+        QPalette.HighlightedText: TEXT_COLOR,
+        QPalette.Link: ACCENT_COLOR,
+        QPalette.LinkVisited: ACCENT_COLOR,
+        QPalette.Mid: BORDER_COLOR,
+        QPalette.Dark: BACKGROUND_COLOR,
+        QPalette.Light: HOVER_COLOR,
+    }
+    for role, color in colors.items():
+        palette.setColor(role, QColor(color))
+    for role in (QPalette.WindowText, QPalette.Text, QPalette.ButtonText):
+        palette.setColor(QPalette.Disabled, role, QColor(TEXT_MUTED_COLOR))
+    return palette
 
 
 def get_application_style():
     return f"""
-        /* General application styling */
-        QMainWindow, QWidget {{
-            background-color: {BACKGROUND_COLOR};
-            color: {TEXT_COLOR};
-            font-family: "Segoe UI", "Noto Sans", sans-serif;
-            font-size: 14px;
-        }}
-
-        /* Tree widget styling */
-        QTreeWidget {{
+        /* Tree views */
+        QTreeView {{
             border: 1px solid {BORDER_COLOR};
             border-radius: 6px;
             background-color: {SURFACE_COLOR};
             alternate-background-color: {SURFACE_ALT_COLOR};
             outline: none;
         }}
-        QTreeWidget::item {{
-            padding: 5px 6px;
-            color: {TEXT_COLOR};
+        QTreeView::item {{
+            padding: 4px 6px;
         }}
-        QTreeWidget::item:hover {{
+        QTreeView::item:hover {{
             background-color: {HOVER_COLOR};
         }}
-        QTreeWidget::item:selected {{
+        QTreeView::item:selected {{
             background-color: {SELECTED_COLOR};
-            color: {TEXT_COLOR};
+        }}
+        QTreeView#thumbnail_tree {{
+            border: none;
+            background-color: {BACKGROUND_COLOR};
+        }}
+        QTreeView#thumbnail_tree::item {{
+            padding: 3px 4px;
+            border-radius: 6px;
+        }}
+        QTreeView#thumbnail_tree::item:selected {{
+            background-color: {SELECTED_COLOR};
+            border: 1px solid {ACCENT_COLOR};
         }}
         QHeaderView::section {{
             background-color: {SURFACE_ALT_COLOR};
@@ -71,6 +112,13 @@ def get_application_style():
             color: {TEXT_MUTED_COLOR};
             background-color: {BACKGROUND_COLOR};
         }}
+        /* Inline editors in tables have only the row height */
+        QAbstractItemView QLineEdit {{
+            padding: 0px 4px;
+            border: 1px solid {ACCENT_COLOR};
+            border-radius: 0px;
+            background-color: {SURFACE_ALT_COLOR};
+        }}
 
         /* Standard buttons */
         QPushButton {{
@@ -92,23 +140,6 @@ def get_application_style():
             color: {TEXT_MUTED_COLOR};
         }}
 
-        /* Thumbnail items */
-        QWidget#thumbnail_panel QPushButton {{
-            padding: 2px;
-            margin: 1px;
-            border: 2px solid transparent;
-            border-radius: 6px;
-            background-color: transparent;
-        }}
-        QWidget#thumbnail_panel QPushButton:hover {{
-            background-color: {HOVER_COLOR};
-            border: 2px solid {BORDER_COLOR};
-        }}
-        QWidget#thumbnail_panel QPushButton:checked {{
-            background-color: {SELECTED_COLOR};
-            border: 2px solid {ACCENT_COLOR};
-        }}
-
         /* Report / text views */
         QTextBrowser {{
             background-color: {SURFACE_COLOR};
@@ -123,12 +154,57 @@ def get_application_style():
             font-size: 12px;
         }}
 
-        /* Study labels in the thumbnail panel */
-        QLabel#study_date_label {{
+        /* Labels */
+        QLabel#hint_label, QLabel#muted_label, QLabel#card_key {{
+            color: {TEXT_MUTED_COLOR};
+        }}
+        QLabel#hint_label {{
+            font-size: 12px;
+        }}
+        QLabel#error_label {{
+            color: {ERROR_COLOR};
+        }}
+        QLabel#warning_label {{
+            color: {WARNING_COLOR};
+        }}
+        QLabel#content_message {{
+            color: {TEXT_MUTED_COLOR};
+            background-color: {VIEWER_BACKGROUND};
+            padding: 24px;
+        }}
+
+        /* Overview */
+        QLabel#section_title {{
+            color: {TEXT_MUTED_COLOR};
+            font-weight: bold;
+            font-size: 12px;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }}
+        QFrame#overview_card {{
+            background-color: {SURFACE_COLOR};
+            border-radius: 6px;
+        }}
+        QLabel#issue_category {{
             color: {TEXT_MUTED_COLOR};
             font-size: 12px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
+            padding-left: 8px;
+            margin-top: 4px;
+        }}
+        QLabel#issue_label {{
+            padding-left: 8px;
+        }}
+        QLabel#issue_label[indent="true"] {{
+            padding-left: 24px;
+        }}
+        QLabel#issue_label[severity="ok"] {{
+            color: {OK_COLOR};
+        }}
+        QLabel#issue_label[severity="error"] {{
+            color: {ERROR_COLOR};
+        }}
+        QLabel#issue_label[severity="warning"] {{
+            color: {WARNING_COLOR};
         }}
 
         /* Tab widget styling */
@@ -304,12 +380,6 @@ def get_application_style():
             background: transparent;
             color: {TEXT_MUTED_COLOR};
             padding: 0px 8px;
-        }}
-
-        /* Study separators */
-        QFrame#study_separator {{
-            background-color: {BORDER_COLOR};
-            border: none;
         }}
 
         /* Scrollbars */
